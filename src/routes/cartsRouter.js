@@ -1,60 +1,36 @@
-import { Router } from 'express';
-import fs from 'fs/promises';
+import express from 'express';
+const router = express.Router();
 
-const router = Router();
-const filePath = './data/carrito.json';
+// Lista de carritos de ejemplo (simulando una base de datos)
+let carts = [
+    { id: 1, products: [{ productId: 1, quantity: 2 }, { productId: 2, quantity: 1 }] },
+    { id: 2, products: [{ productId: 3, quantity: 1 }] }
+];
 
-// Funciones de utilidad
-const readCarts = async () => {
-    try {
-        const data = await fs.readFile(filePath, 'utf-8');
-        return JSON.parse(data) || [];
-    } catch {
-        return [];
+// Ruta POST para crear un nuevo carrito
+router.post('/', (req, res) => {
+    // Recibir los datos del carrito desde el cuerpo de la solicitud
+    const { products } = req.body;
+
+    // Validar que los productos sean un array
+    if (!Array.isArray(products)) {
+        return res.status(400).json({ error: 'El campo "products" debe ser un array' });
     }
-};
 
-const writeCarts = async (carts) => {
-    await fs.writeFile(filePath, JSON.stringify(carts, null, 2));
-};
+    // Generar un nuevo id para el carrito (asegurándonos de que no se repita)
+    const newId = carts.length ? carts[carts.length - 1].id + 1 : 1;
 
-// 1. POST '/' - Crear un carrito nuevo
-router.post('/', async (req, res) => {
-    const carts = await readCarts();
-    const newCart = { id: (carts.length + 1).toString(), products: [] };
+    // Crear el nuevo carrito
+    const newCart = {
+        id: newId,
+        products: products // Asignamos los productos enviados en el cuerpo de la solicitud
+    };
+
+    // Agregar el nuevo carrito a la lista
     carts.push(newCart);
-    await writeCarts(carts);
+
+    // Responder con el carrito creado
     res.status(201).json(newCart);
-});
-
-// 2. GET '/:cid' - Obtener productos de un carrito
-router.get('/:cid', async (req, res) => {
-    const { cid } = req.params;
-    const carts = await readCarts();
-    const cart = carts.find((c) => c.id === cid);
-    if (!cart) return res.status(404).json({ error: 'Carrito no encontrado' });
-    res.json(cart.products);
-});
-
-// 3. POST '/:cid/product/:pid' - Agregar producto al carrito
-router.post('/:cid/product/:pid', async (req, res) => {
-    const { cid, pid } = req.params;
-    const carts = await readCarts();
-    const cartIndex = carts.findIndex((c) => c.id === cid);
-
-    if (cartIndex === -1) return res.status(404).json({ error: 'Carrito no encontrado' });
-
-    const cart = carts[cartIndex];
-    const product = cart.products.find((p) => p.product === pid);
-
-    if (product) {
-        product.quantity += 1; // Incrementar cantidad si el producto ya existe
-    } else {
-        cart.products.push({ product: pid, quantity: 1 }); // Agregar nuevo producto
-    }
-
-    await writeCarts(carts);
-    res.json(cart);
 });
 
 export default router;
